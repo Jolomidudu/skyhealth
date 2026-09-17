@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   Bell,
   Calendar,
   Users,
   Activity,
-  Clock,
   ChevronRight,
   Plus,
   Home,
@@ -17,17 +16,160 @@ import {
   LogOut,
   Heart,
   AlertCircle,
+  XCircle,
+  CheckCircle2,
 } from "lucide-react";
-import { appointments, doctors, patients, departments } from "@/lib/data";
+import {
+  appointments as seedAppointments,
+  doctors,
+  patients,
+  departments,
+  type Appointment,
+} from "@/lib/data";
+
+type BookingModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onBook: (appointment: Appointment) => void;
+};
+
+function BookingModal({ isOpen, onClose, onBook }: BookingModalProps) {
+  const [patientName, setPatientName] = useState("");
+  const [doctorName, setDoctorName] = useState(doctors[0]?.name ?? "");
+  const [department, setDepartment] = useState(departments[0]?.name ?? "");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+
+  if (!isOpen) return null;
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onBook({
+      id: `apt-${Date.now()}`,
+      patientName,
+      doctorName,
+      department,
+      type: seedAppointments[0]?.type ?? ("" as Appointment["type"]),
+      date,
+      time,
+      status: "scheduled",
+    });
+    setPatientName("");
+    setDate("");
+    setTime("");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">New Appointment</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <input required value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Patient name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          <select value={doctorName} onChange={(e) => setDoctorName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+            {doctors.map((doctor) => <option key={doctor.id}>{doctor.name}</option>)}
+          </select>
+          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+            {departments.map((dept) => <option key={dept.id}>{dept.name}</option>)}
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input required type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          </div>
+        </div>
+        <button type="submit" className="mt-5 w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Book Appointment</button>
+      </form>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("home");
-  const todayAppointments = appointments.filter((a) => a.date === "2026-09-16");
-  const inProgress = todayAppointments.filter((a) => a.status === "in-progress");
-  const upcoming = todayAppointments.filter((a) => a.status === "scheduled");
+  const [appointments, setAppointments] = useState<Appointment[]>(seedAppointments);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Load from localStorage on mount (persist across refresh)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("skyhealth-appointments");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Appointment[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAppointments(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Persist whenever appointments change
+  useEffect(() => {
+    localStorage.setItem("skyhealth-appointments", JSON.stringify(appointments));
+  }, [appointments]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function handleBook(newApt: Appointment) {
+    setAppointments((prev) => [newApt, ...prev]);
+    showToast(`Appointment booked for ${newApt.patientName}`);
+  }
+
+  function updateStatus(id: string, status: Appointment["status"]) {
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status } : a))
+    );
+    // also try API
+    fetch("/api/appointments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    }).catch(() => {});
+    showToast(
+      status === "cancelled"
+        ? "Appointment cancelled"
+        : status === "completed"
+        ? "Marked as completed"
+        : "Status updated"
+    );
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayAppointments = appointments.filter(
+    (a) => a.date === today || a.date === "2026-09-16" || a.date === "2026-09-17"
+  );
+  // fallback: show all if none match today (for demo with old seed dates)
+  const displayToday =
+    todayAppointments.length > 0 ? todayAppointments : appointments.slice(0, 6);
+
+  const inProgress = displayToday.filter((a) => a.status === "in-progress");
+  const scheduledCount = appointments.filter((a) => a.status === "scheduled").length;
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-[60] bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-medium animate-in fade-in slide-in-from-top-2">
+          {toast}
+        </div>
+      )}
+
+      {/* Booking Modal */}
+      <BookingModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        onBook={handleBook}
+      />
+
       {/* Sidebar */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col">
         <div className="p-5 flex items-center gap-3 border-b border-slate-100">
@@ -95,6 +237,13 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsBookingOpen(true)}
+              className="hidden sm:inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-blue-700/20 transition"
+            >
+              <Plus className="w-4 h-4" />
+              New Appointment
+            </button>
             <button className="relative w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
@@ -125,7 +274,10 @@ export default function DashboardPage() {
                     Here&apos;s what&apos;s happening at SkyHealth today.
                   </p>
                 </div>
-                <button className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-700/20 transition">
+                <button
+                  onClick={() => setIsBookingOpen(true)}
+                  className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-700/20 transition"
+                >
                   <Plus className="w-4 h-4" />
                   New Appointment
                 </button>
@@ -135,8 +287,8 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   {
-                    label: "Today's Appointments",
-                    value: todayAppointments.length,
+                    label: "Total Appointments",
+                    value: appointments.length,
                     icon: Calendar,
                     color: "bg-blue-50 text-blue-700",
                   },
@@ -147,8 +299,8 @@ export default function DashboardPage() {
                     color: "bg-emerald-50 text-emerald-700",
                   },
                   {
-                    label: "In Progress",
-                    value: inProgress.length,
+                    label: "Scheduled",
+                    value: scheduledCount,
                     icon: Activity,
                     color: "bg-amber-50 text-amber-700",
                   },
@@ -191,45 +343,74 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   <div className="divide-y divide-slate-50">
-                    {todayAppointments.map((apt) => (
-                      <div
-                        key={apt.id}
-                        className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition"
-                      >
-                        <div className="w-12 text-center">
-                          <p className="text-sm font-bold text-slate-900">
-                            {apt.time.split(" ")[0]}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {apt.time.split(" ")[1]}
-                          </p>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">
-                            {apt.patientName}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {apt.doctorName} · {apt.department}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                              apt.status === "in-progress"
-                                ? "bg-amber-100 text-amber-800"
-                                : apt.status === "completed"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {apt.status}
-                          </span>
-                          <span className="text-xs text-slate-400 capitalize hidden sm:inline">
-                            {apt.type}
-                          </span>
-                        </div>
+                    {displayToday.length === 0 ? (
+                      <div className="px-5 py-10 text-center text-slate-400">
+                        No appointments yet.{" "}
+                        <button
+                          onClick={() => setIsBookingOpen(true)}
+                          className="text-blue-600 font-medium hover:underline"
+                        >
+                          Book one
+                        </button>
                       </div>
-                    ))}
+                    ) : (
+                      displayToday.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition"
+                        >
+                          <div className="w-14 text-center shrink-0">
+                            <p className="text-sm font-bold text-slate-900">
+                              {apt.time.split(" ")[0]}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {apt.time.split(" ")[1]}
+                            </p>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">
+                              {apt.patientName}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              {apt.doctorName} · {apt.department}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                                apt.status === "in-progress"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : apt.status === "completed"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : apt.status === "cancelled"
+                                  ? "bg-slate-100 text-slate-500 line-through"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {apt.status}
+                            </span>
+                            {apt.status === "scheduled" && (
+                              <div className="flex gap-1">
+                                <button
+                                  title="Mark completed"
+                                  onClick={() => updateStatus(apt.id, "completed")}
+                                  className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Cancel"
+                                  onClick={() => updateStatus(apt.id, "cancelled")}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -246,8 +427,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="p-4 space-y-3">
                     {doctors.map((doc) => (
-                      <div
+                      <Link
                         key={doc.id}
+                        href={`/doctors/${doc.id}`}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition cursor-pointer"
                       >
                         <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-2xl">
@@ -264,7 +446,7 @@ export default function DashboardPage() {
                             <span>{doc.satisfaction}% sat.</span>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -276,9 +458,6 @@ export default function DashboardPage() {
                   <h3 className="font-bold text-slate-900">
                     Browse by Department
                   </h3>
-                  <button className="text-sm text-blue-600 font-medium">
-                    See all
-                  </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                   {departments.map((dept) => (
@@ -302,50 +481,87 @@ export default function DashboardPage() {
 
           {activeTab === "appointments" && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-slate-900">
-                All Appointments
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">
+                  All Appointments
+                </h2>
+                <button
+                  onClick={() => setIsBookingOpen(true)}
+                  className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  New
+                </button>
+              </div>
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-left">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">Patient</th>
-                      <th className="px-5 py-3 font-medium hidden sm:table-cell">
-                        Doctor
-                      </th>
-                      <th className="px-5 py-3 font-medium">Department</th>
-                      <th className="px-5 py-3 font-medium">Time</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {appointments.map((apt) => (
-                      <tr key={apt.id} className="hover:bg-slate-50">
-                        <td className="px-5 py-4 font-medium text-slate-900">
-                          {apt.patientName}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600 hidden sm:table-cell">
-                          {apt.doctorName}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {apt.department}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">{apt.time}</td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                              apt.status === "in-progress"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {apt.status}
-                          </span>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-500 text-left">
+                      <tr>
+                        <th className="px-5 py-3 font-medium">Patient</th>
+                        <th className="px-5 py-3 font-medium hidden sm:table-cell">
+                          Doctor
+                        </th>
+                        <th className="px-5 py-3 font-medium">Department</th>
+                        <th className="px-5 py-3 font-medium">Date</th>
+                        <th className="px-5 py-3 font-medium">Time</th>
+                        <th className="px-5 py-3 font-medium">Status</th>
+                        <th className="px-5 py-3 font-medium">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {appointments.map((apt) => (
+                        <tr key={apt.id} className="hover:bg-slate-50">
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            {apt.patientName}
+                          </td>
+                          <td className="px-5 py-4 text-slate-600 hidden sm:table-cell">
+                            {apt.doctorName}
+                          </td>
+                          <td className="px-5 py-4 text-slate-600">
+                            {apt.department}
+                          </td>
+                          <td className="px-5 py-4 text-slate-600">{apt.date}</td>
+                          <td className="px-5 py-4 text-slate-600">{apt.time}</td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                                apt.status === "in-progress"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : apt.status === "completed"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : apt.status === "cancelled"
+                                  ? "bg-slate-100 text-slate-500"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {apt.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            {apt.status === "scheduled" && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => updateStatus(apt.id, "completed")}
+                                  className="text-xs text-emerald-600 hover:underline font-medium"
+                                >
+                                  Complete
+                                </button>
+                                <span className="text-slate-300">|</span>
+                                <button
+                                  onClick={() => updateStatus(apt.id, "cancelled")}
+                                  className="text-xs text-red-500 hover:underline font-medium"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -385,6 +601,14 @@ export default function DashboardPage() {
                     <p className="mt-1 text-xs text-slate-400">
                       Last visit: {p.lastVisit}
                     </p>
+                    <button
+                      onClick={() => {
+                        setIsBookingOpen(true);
+                      }}
+                      className="mt-4 w-full text-sm font-medium text-blue-600 hover:text-blue-700 py-2 rounded-lg border border-blue-100 hover:bg-blue-50 transition"
+                    >
+                      Book Appointment
+                    </button>
                   </div>
                 ))}
               </div>
@@ -417,7 +641,10 @@ export default function DashboardPage() {
                         <span>{doc.patients} active patients</span>
                         <span>{doc.satisfaction}% satisfaction</span>
                       </div>
-                      <button className="mt-4 w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                      <button
+                        onClick={() => setIsBookingOpen(true)}
+                        className="mt-4 w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold py-2.5 rounded-xl transition"
+                      >
                         Schedule Visit →
                       </button>
                       <p className="mt-2 text-[10px] text-slate-400 flex items-center gap-1">

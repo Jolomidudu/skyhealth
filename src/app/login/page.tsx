@@ -118,9 +118,13 @@ function LoginForm() {
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
           Demo accounts
         </p>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          Passwords | Admin: admin123 | Doctor: doctor123 | Patient: patient123
+        </p>
         <div className="space-y-2 text-sm">
           {[
             { role: "Admin", email: "admin@skyhealth.com", pass: "admin123", color: "bg-blue-50 text-blue-700" },
+            
             { role: "Doctor", email: "aisha@skyhealth.com", pass: "doctor123", color: "bg-emerald-50 text-emerald-700" },
             { role: "Patient", email: "james@email.com", pass: "patient123", color: "bg-amber-50 text-amber-700" },
           ].map((acc) => (

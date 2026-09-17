@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   Search,
@@ -26,73 +28,31 @@ import {
   departments,
   type Appointment,
 } from "@/lib/data";
-
-type BookingModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onBook: (appointment: Appointment) => void;
-};
-
-function BookingModal({ isOpen, onClose, onBook }: BookingModalProps) {
-  const [patientName, setPatientName] = useState("");
-  const [doctorName, setDoctorName] = useState(doctors[0]?.name ?? "");
-  const [department, setDepartment] = useState(departments[0]?.name ?? "");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-
-  if (!isOpen) return null;
-
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onBook({
-      id: `apt-${Date.now()}`,
-      patientName,
-      doctorName,
-      department,
-      type: seedAppointments[0]?.type ?? ("" as Appointment["type"]),
-      date,
-      time,
-      status: "scheduled",
-    });
-    setPatientName("");
-    setDate("");
-    setTime("");
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">New Appointment</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
-            <XCircle className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <input required value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Patient name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          <select value={doctorName} onChange={(e) => setDoctorName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-            {doctors.map((doctor) => <option key={doctor.id}>{doctor.name}</option>)}
-          </select>
-          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-            {departments.map((dept) => <option key={dept.id}>{dept.name}</option>)}
-          </select>
-          <div className="grid grid-cols-2 gap-3">
-            <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-            <input required type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </div>
-        </div>
-        <button type="submit" className="mt-5 w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Book Appointment</button>
-      </form>
-    </div>
-  );
-}
+import BookingModal from "@/components/BookingModal";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("home");
   const [appointments, setAppointments] = useState<Appointment[]>(seedAppointments);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; role: string; avatar: string } | null>(null);
+  const router = useRouter();
+
+  // Fetch current session
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.user) setUser(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  router.push("/login");
+  router.refresh();
+}
 
   // Load from localStorage on mount (persist across refresh)
   useEffect(() => {
@@ -212,13 +172,13 @@ export default function DashboardPage() {
             <Settings className="w-5 h-5" />
             Settings
           </button>
-          <Link
-            href="/"
+          <button
+            onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <LogOut className="w-5 h-5" />
             Sign out
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -248,14 +208,21 @@ export default function DashboardPage() {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
             </button>
-            <div className="flex items-center gap-2 pl-2">
+           <div className="flex items-center gap-2 pl-2">
               <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-lg">
-                👨‍⚕️
+                {user?.avatar || "👨‍⚕️"}
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm font-semibold text-slate-900">Dr. Admin</p>
-                <p className="text-xs text-slate-500">Administrator</p>
+                <p className="text-sm font-semibold text-slate-900">{user?.name || "User"}</p>
+                <p className="text-xs text-slate-500 capitalize">{user?.role || "staff"}</p>
               </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="ml-1 p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </header>

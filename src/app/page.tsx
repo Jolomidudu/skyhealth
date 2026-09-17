@@ -50,7 +50,7 @@ export default function Home() {
             How it works
           </a>
           <Link
-            href="/dashboard"
+           href="/login"
             className="text-blue-700 hover:text-blue-800 transition"
           >
             Dashboard
@@ -64,7 +64,7 @@ export default function Home() {
             Sign in
           </Link>
           <Link
-            href="/dashboard"
+            href="/login"
             className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg shadow-blue-700/25 transition"
           >
             Get Started
@@ -99,7 +99,7 @@ export default function Home() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/dashboard"
+                href="/login"
                 className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold px-7 py-3.5 rounded-xl shadow-xl shadow-blue-700/30 transition-all hover:scale-[1.02]"
               >
                 Explore Dashboard
@@ -418,7 +418,7 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
-              href="/dashboard"
+              href="/login"
               className="inline-flex items-center gap-2 bg-white text-blue-800 font-semibold px-8 py-3.5 rounded-xl shadow-lg hover:bg-blue-50 transition"
             >
               Launch Dashboard

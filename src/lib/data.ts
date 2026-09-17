@@ -177,3 +177,57 @@ export const departments = [
   { id: "neuro", name: "Neurology", icon: "🧠", count: 9 },
   { id: "ortho", name: "Orthopedics", icon: "🦵", count: 15 },
 ];
+
+export type Role = "admin" | "doctor" | "patient";
+
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // plain for demo only – hash in production
+  role: Role;
+  avatar: string;
+};
+
+export const users: User[] = [
+  {
+    id: "u1",
+    name: "Dr. Admin",
+    email: "admin@skyhealth.com",
+    password: "admin123",
+    role: "admin",
+    avatar: "👨‍⚕️",
+  },
+  {
+    id: "u2",
+    name: "Dr. Aisha Okoro",
+    email: "aisha@skyhealth.com",
+    password: "doctor123",
+    role: "doctor",
+    avatar: "👩‍⚕️",
+  },
+  {
+    id: "u3",
+    name: "Dr. Chinedu Eze",
+    email: "chinedu@skyhealth.com",
+    password: "doctor123",
+    role: "doctor",
+    avatar: "👨‍⚕️",
+  },
+  {
+    id: "u4",
+    name: "James Okonkwo",
+    email: "james@email.com",
+    password: "patient123",
+    role: "patient",
+    avatar: "🧑",
+  },
+  {
+    id: "u5",
+    name: "Fatima Bello",
+    email: "fatima@email.com",
+    password: "patient123",
+    role: "patient",
+    avatar: "👩",
+  },
+];

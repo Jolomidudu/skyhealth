@@ -118,7 +118,7 @@ function LoginForm() {
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
           Demo accounts
         </p>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+        <p className="text-xs font-semibold text-slate-500 tracking-wider mb-3">
           Passwords | Admin: admin123 | Doctor: doctor123 | Patient: patient123
         </p>
         <div className="space-y-2 text-sm">
